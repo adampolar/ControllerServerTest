@@ -1,0 +1,153 @@
+<html style="margin:0px; padding:0px">
+
+    <head>
+        <script src="webrift.js"></script>
+        <script src="three.min.js"></script>
+        <script src="OculusRiftEffect.js"></script>
+    </head>
+
+    <body style="margin:0px; padding: 0px">
+        <canvas id="renderCanvas" style="width:100%; height:100%;"></canvas>
+    </body>
+
+    <script>
+
+        var camera, scene, renderer,
+            geometry, material, light, sphere, velocity = new THREE.Vector3(0.020, 0.021, 0.022),
+            mesh, texture, t=0,
+            OReffect, webrift, player, clock = new THREE.Clock();;
+
+        init();
+        animate();
+
+        function init() {
+
+            webrift = new Webrift("ws://localhost:51343");
+			player = {};
+			player.position = new THREE.Vector3(0,0,0);
+			player.velocity = 0.1;
+			player.lookVelocity = 0.1;
+			player.view = new THREE.Vector3(0,0,0);
+			
+            camera = new THREE.PerspectiveCamera(75, 1280/800, 0.3, 10000.0);
+            camera.position.set(0, 1.62, 3.0);
+
+            scene = new THREE.Scene();
+
+            geometry = new THREE.CubeGeometry(8, 8 ,8);
+            geometry.computeTangents();
+            texture = new THREE.ImageUtils.loadTexture( 'grid.png' );
+            normal = new THREE.ImageUtils.loadTexture( 'normalmap.png' );
+            material = new THREE.MeshPhongMaterial({color: 0xffffff, side: THREE.DoubleSide, map: texture, normalMap: normal, shininess: 100, metal: false, specular: 0xffffff});
+            mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(0, 4, 0);
+            scene.add(mesh);
+
+            geometry = new THREE.SphereGeometry(0.1, 16, 32)
+            material = new THREE.MeshBasicMaterial({color: 0xffffff});
+            sphere = new THREE.Mesh(geometry, material);
+            sphere.position.set(0, 4, 0);
+            scene.add(sphere);
+
+            light = new THREE.PointLight(0xffffff, 1.0, 48.0);
+            light.position.set(0, 4, 0);
+            scene.add(light)
+
+            var canvas = document.getElementById("renderCanvas");
+            renderer = new THREE.WebGLRenderer({canvas: canvas});
+            renderer.setSize(1280, 800);
+            renderer.setClearColor(0xffffff);
+
+            var HMD = {
+                hResolution: window.innerWidth,
+                vResolution: window.innerHeight,
+                hScreenSize: 0.14976,
+                vScreenSize: 0.0936,
+                interpupillaryDistance: 0.064,
+                lensSeparationDistance: 0.064,
+                eyeToScreenDistance: 0.041,
+                distortionK : [1.0, 0.22, 0.24, 0.0],
+                chromaAbParameter: [ 0.996, -0.004, 1.014, 0.0]
+            };
+            OReffect = new THREE.OculusRiftEffect(renderer, {HMD: HMD, worldFactor: 1.0});
+			OReffect.setSize( window.innerWidth, window.innerHeight );
+
+            document.body.appendChild(renderer.domElement);
+
+        }
+		
+		function changeLightColour(hexcolor) {
+			sphere.material.color.setHex(hexcolor);
+			light.color.setHex(hexcolor);
+		}
+
+        function animate() {
+
+            requestAnimationFrame(animate);
+            sphere.position.add(velocity);
+            if (sphere.position.x > 4 - 0.1 || sphere.position.x < -4 + 0.1) {
+                velocity.x *= -1;
+            }
+            if (sphere.position.y > 8 - 0.1 || sphere.position.y < 0 + 0.1) {
+                velocity.y *= -1;
+            }
+            if (sphere.position.z > 4 - 0.1 || sphere.position.z < -4 + 0.1) {
+                velocity.z *= -1;
+            }
+			
+			camera.quaternion.set(webrift.x, webrift.y, webrift.z, webrift.w);
+			/*camera.rotation.x = player.view.x;
+			camera.rotation.y = player.view.y;
+			camera.rotation.z = player.view.z;*/
+			camera.position.set(0 +  5*webrift.px + player.position.x,
+				1.62 + 5*webrift.py  + player.position.y, 
+				3.0 +  5*webrift.pz  + player.position.z);
+			if(webrift.Xbox360Controller) {
+				if(webrift.Xbox360Controller.Buttons.A ===0) {
+					changeLightColour(0x00ff00);
+				}
+				if(webrift.Xbox360Controller.Buttons.B ===0) {
+					changeLightColour(0xff0000);
+				}
+				if(webrift.Xbox360Controller.Buttons.X ===0) {
+					changeLightColour(0x0000ff);
+				}
+				if(webrift.Xbox360Controller.Buttons.Y ===0) {
+					changeLightColour(0xffff00);
+				}
+				player.position.add(
+					new THREE.Vector3(
+						(webrift.Xbox360Controller.ThumbSticks.Left.X * player.velocity) * Math.cos(player.view.y)
+							+ (webrift.Xbox360Controller.ThumbSticks.Left.Y * player.velocity) * -Math.sin(player.view.y),
+						0, 
+						(webrift.Xbox360Controller.ThumbSticks.Left.Y * player.velocity) * -Math.cos(player.view.y)
+							- (webrift.Xbox360Controller.ThumbSticks.Left.X * player.velocity) * Math.sin(player.view.y)
+						)); 
+				if (player.position.x > 4 - 1) {
+					player.position.x = 4 - 1
+				}
+				if (player.position.x < -4 + 1) {
+					player.position.x = -4 + 1
+				}
+				if (player.position.z > 1) {
+					player.position.z = 1;
+				}
+				if (player.position.z < -8+2) {
+					player.position.z = -8+2;
+				}
+				/*player.view.add(new THREE.Vector3(
+						0,
+						-webrift.Xbox360Controller.ThumbSticks.Right.X * player.lookVelocity,
+						 0)); */
+			}
+			
+			
+            light.position.copy(sphere.position);
+            OReffect.render(scene, camera);
+
+        }
+
+    </script>
+
+
+</html>
